@@ -74,7 +74,9 @@ void CircularBuffer::pushElement( float elementVal )
 //Averages the last n numbers and provides that.  Discards fractions
 float CircularBuffer::averageLast( uint16_t numElements )
 {
-	if( numElements < recordLength() )
+	if( numElements > recordLength() ) //  BUG FIX reverse: should be  ">" instead of "<" 
+/** if numElement greater than actual recordLength() 
+ then shrink it so that not to include empty cells into average **/
 	{
 		numElements = recordLength();
 	}
