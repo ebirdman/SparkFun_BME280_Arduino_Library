@@ -54,6 +54,7 @@ uint8_t buttonSensePin = A2;
 //This is a fixed-size buffer used for averaging data, a software LP filter
 //Depending on the settings, the response can be quite slow.
 CircularBuffer myBuffer(50);
+#define AVERAGE_SAMPLES_NUM 15	// number of latest samples from myBuffer to be included in average calc
 
 float reference = 0;
 
@@ -71,7 +72,8 @@ void setup()
 	
 	//For I2C, enable the following and disable the SPI section
 	mySensor.settings.commInterface = I2C_MODE;
-	mySensor.settings.I2CAddress = 0x77;
+//	mySensor.settings.I2CAddress = 0x77;
+	mySensor.settings.I2CAddress = 0x76;
 	
 	//For SPI enable the following and dissable the I2C section
 	//mySensor.settings.commInterface = SPI_MODE;
@@ -104,31 +106,36 @@ void setup()
 	//  3, coefficients = 8
 	//  4, coefficients = 16
 	mySensor.settings.filter = 4; //Lots of HW filter
+
+/** for the most accuracy, precision, least noise reading pressure follow BME280 datasheet p.19
+	pressure oversampling x8, temp oversampling x1  noise 0.2 , no need for humidity reading
+	(pressure x16 / temp x2 gives no better noise (0.2), but only increases time and amps consumption)
+**/
+	// Keep this ahead of Temp and Pressure settings
+	// to match proper sequence of registers setup in mySensor.begin()
+	// humidOverSample can be:
+	//  0, skipped
+	//  1 through 5, oversampling *1, *2, *4, *8, *16 respectively
+	mySensor.settings.humidOverSample = 0;	// no need to read humidity for this example - skip it
 	
 	//tempOverSample can be:
 	//  0, skipped
 	//  1 through 5, oversampling *1, *2, *4, *8, *16 respectively
-	mySensor.settings.tempOverSample = 5;
+	mySensor.settings.tempOverSample = 1;	// x1 sampling (see above comment)
 
 	//pressOverSample can be:
 	//  0, skipped
 	//  1 through 5, oversampling *1, *2, *4, *8, *16 respectively
-    mySensor.settings.pressOverSample = 5;
-	
-	//humidOverSample can be:
-	//  0, skipped
-	//  1 through 5, oversampling *1, *2, *4, *8, *16 respectively
-	mySensor.settings.humidOverSample = 1;
+    mySensor.settings.pressOverSample = 4;	// x8 sampling (see above comment)
 	
 	Serial.begin(57600);
 	Serial.print("Program Started\n");
 	Serial.print("Starting BME280... result of .begin(): 0x");
-	delay(10);  //Make sure sensor had enough time to turn on. BME280 requires 2ms to start up.
-	//Calling .begin() causes the settings to be loaded
 	Serial.println(mySensor.begin(), HEX);
+	delay(5);  //Make sure sensor had enough time to turn on after begin(). BME280 requires 2ms to start up.
+	//Calling .begin() causes the settings to be loaded
 
 	Serial.println();
-
 }
 
 void loop()
@@ -145,7 +152,7 @@ void loop()
 	
 	float lastAlt = mySensor.readFloatAltitudeFeet() - reference;
 	myBuffer.pushElement(lastAlt);
-	float tempAlt = myBuffer.averageLast(15); //Do an average of the latest samples
+	float tempAlt = myBuffer.averageLast(AVERAGE_SAMPLES_NUM); //Do an average of the latest samples
 	
 	Serial.println();
 	Serial.print("Temperature: ");
@@ -158,7 +165,7 @@ void loop()
 	}
 	Serial.print(lastAlt, 2);
 	Serial.println(" ft");	
-	Serial.print("Last 15 samples averaged: ");
+	Serial.print("Last samples averaged: ");
 	if(tempAlt >= 0)
 	{
 		Serial.print(" ");
@@ -166,5 +173,4 @@ void loop()
 	Serial.print(tempAlt);
 	Serial.println(" ft");
 	delay(200);
-
 }
